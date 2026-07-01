@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 cmake_policy(SET CMP0091 NEW)
+if(POLICY CMP0144)
+	cmake_policy(SET CMP0144 NEW)
+endif()
+if(POLICY CMP0167)
+	cmake_policy(SET CMP0167 OLD)
+endif()
 project(discord-connector VERSION 0.3.6)
 
 if (NOT DCC_VERSION) # allow version override
@@ -29,6 +35,12 @@ endif()
 include(libs/cmake-conan/conan.cmake)
 function(add_conan_lib pkg_name conan_pkg)
 	conan_check(REQUIRED)
+
+	# cmake-conan 0.18.1 predates MSVC 19.40+, although these toolsets still
+	# belong to Visual Studio 2022 (compiler version 17 in Conan 1).
+	if(MSVC AND NOT MSVC_VERSION VERSION_LESS 1940)
+		set(MSVC_VERSION 1939)
+	endif()
 
 	conan_cmake_run(
 		REQUIRES ${conan_pkg}
@@ -77,7 +89,6 @@ if(USING_BOOST_NO_CONAN)
 	endif()
 	mark_as_advanced(BOOST_ROOT Boost_DIR)
 
-	set(Boost_INCLUDE_DIR "${Boost_INCLUDE_DIR}" PARENT_SCOPE)
 else()
 	conan_check(REQUIRED)
 	conan_cmake_run(

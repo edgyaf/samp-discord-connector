@@ -165,6 +165,12 @@ elseif(UNIX)
 		-Wextra
 		-pedantic
 	)
+
+	# Boost.Beast's optimized 32-bit websocket write path crashes during
+	# gateway startup. Keep the rest of the Release build optimized.
+	set_source_files_properties(WebSocket.cpp PROPERTIES
+		COMPILE_OPTIONS "$<$<CONFIG:Release>:-O0>"
+	)
 endif()
 
 if (MSVC)
