@@ -30,12 +30,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-20.04]
+        os: [windows-latest, ubuntu-22.04]
         build-type: [Debug, Release]
         include:
           - os: windows-latest
             cmake-args: '-AWin32 -Thost=x86 -DGH_ACBUILD=TRUE  -DUSING_BOOST_NO_CONAN=TRUE -DUSING_OPENSSL_NO_CONAN=TRUE -DBoost_NO_BOOST_CMAKE=ON'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             cmake-args: '-DCMAKE_CXX_FLAGS=-m32 -DCMAKE_C_FLAGS=-m32 -DGH_ACBUILD=TRUE'
 
     runs-on: ${{ matrix.os }}
@@ -44,7 +44,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: 2
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
@@ -80,10 +80,10 @@ jobs:
       run: |
         sudo dpkg --add-architecture i386
         sudo apt-get update
-        sudo apt install gcc-9-multilib g++-9-multilib libstdc++-10-dev:i386
+        sudo apt-get install -y gcc-multilib g++-multilib
 
     - name: Get python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v6
       with:
         python-version: 3.9.0 # SemVer's version range syntax
 
@@ -110,7 +110,7 @@ jobs:
       shell: pwsh
       
     - name: Upload artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v7
       with:
         name: discord-connector-${{ env.REPO_TAG }}-${{ runner.os }}-${{ matrix.build-type }}
         path: ${{ runner.workspace }}/samp-discord-connector/build/artifact/discord-connector-${{ env.REPO_TAG }}-${{ runner.os }}-${{ matrix.build-type }}.zip
