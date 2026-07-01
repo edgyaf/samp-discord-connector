@@ -110,6 +110,8 @@ private: // variables
 	using WebSocketStream_t = beast::websocket::stream<SslStream_t>;
 	std::unique_ptr<WebSocketStream_t> _websocket;
 	std::deque<std::string> _writeQueue;
+	bool _closePending = false;
+	bool _closing = false;
 
 	bool _reconnect = false;
 	asio::steady_timer _reconnectTimer;
@@ -138,6 +140,7 @@ private: // functions
 	void OnHandshake(beast::error_code ec);
 
 	void Disconnect(bool reconnect = false);
+	void StartClose();
 	void OnClose(beast::error_code ec);
 	void OnReconnect(beast::error_code ec);
 

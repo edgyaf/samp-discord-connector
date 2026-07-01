@@ -168,15 +168,48 @@ void WebSocket::Disconnect(bool reconnect /*= false*/)
 {
 	Logger::Get()->Log(samplog_LogLevel::DEBUG, "WebSocket::Disconnect");
 
-	_reconnect = reconnect;
+	asio::post(_ioContext, [this, reconnect]()
+	{
+		_reconnect = reconnect;
+		m_HeartbeatTimer.cancel();
 
-	if (_websocket)
+		if (_closing)
+			return;
+
+		if (!_writeQueue.empty())
+		{
+			_closePending = true;
+			return;
+		}
+
+		StartClose();
+	});
+}
+
+void WebSocket::StartClose()
+{
+	_closePending = false;
+
+	if (!_websocket)
+	{
+		OnClose({});
+		return;
+	}
+
+	_closing = true;
+	if (_websocket->is_open())
 	{
 		_websocket->async_close(
 			beast::websocket::close_code::normal,
 			beast::bind_front_handler(
 				&WebSocket::OnClose,
 				this));
+	}
+	else
+	{
+		beast::error_code ignored;
+		beast::get_lowest_layer(*_websocket).socket().close(ignored);
+		OnClose(ignored);
 	}
 }
 
@@ -186,6 +219,9 @@ void WebSocket::OnClose(beast::error_code ec)
 
 	Logger::Get()->Log(samplog_LogLevel::DEBUG, "WebSocket::OnClose");
 
+	_closing = false;
+	_closePending = false;
+	_writeQueue.clear();
 	m_HeartbeatTimer.cancel();
 
 	if (_reconnect)
@@ -426,7 +462,7 @@ void WebSocket::Write(std::string data)
 
 	asio::post(_ioContext, [this, data = std::move(data)]() mutable
 	{
-		if (!_websocket)
+		if (!_websocket || _closing || _closePending)
 			return;
 
 		bool const writeInProgress = !_writeQueue.empty();
@@ -459,12 +495,19 @@ void WebSocket::OnWrite(beast::error_code ec,
 			ec.message(), ec.value());
 
 		_writeQueue.clear();
+		if (_closePending)
+			StartClose();
 		// we don't handle reconnects here, as the read handler already does this
 		return;
 	}
 
 	_writeQueue.pop_front();
-	if (!_writeQueue.empty())
+	if (_closePending)
+	{
+		_writeQueue.clear();
+		StartClose();
+	}
+	else if (!_writeQueue.empty())
 		StartWrite();
 }
 
