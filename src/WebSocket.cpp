@@ -176,7 +176,7 @@ void WebSocket::Disconnect(bool reconnect /*= false*/)
 		if (_closing)
 			return;
 
-		if (!_writeQueue.empty())
+		if (_writeInProgress || !_writeQueue.empty())
 		{
 			_closePending = true;
 			return;
@@ -221,6 +221,7 @@ void WebSocket::OnClose(beast::error_code ec)
 
 	_closing = false;
 	_closePending = false;
+	_writeInProgress = false;
 	_writeQueue.clear();
 	m_HeartbeatTimer.cancel();
 
@@ -465,20 +466,28 @@ void WebSocket::Write(std::string data)
 		if (!_websocket || _closing || _closePending)
 			return;
 
-		bool const writeInProgress = !_writeQueue.empty();
 		_writeQueue.emplace_back(std::move(data));
-		if (!writeInProgress)
+		if (!_writeInProgress)
 			StartWrite();
 	});
 }
 
 void WebSocket::StartWrite()
 {
+	if (_writeInProgress || _writeQueue.empty())
+		return;
+
+	auto payload = std::make_shared<std::string>(
+		std::move(_writeQueue.front()));
+	_writeQueue.pop_front();
+	_writeInProgress = true;
+
 	_websocket->async_write(
-		asio::buffer(_writeQueue.front()),
-		beast::bind_front_handler(
-			&WebSocket::OnWrite,
-			this));
+		asio::buffer(*payload),
+		[this, payload](beast::error_code ec, std::size_t bytes_transferred)
+		{
+			OnWrite(ec, bytes_transferred);
+		});
 }
 
 void WebSocket::OnWrite(beast::error_code ec,
@@ -487,6 +496,8 @@ void WebSocket::OnWrite(beast::error_code ec,
 	Logger::Get()->Log(samplog_LogLevel::DEBUG, 
 		"WebSocket::OnWrite({:d})", 
 		bytes_transferred);
+
+	_writeInProgress = false;
 
 	if (ec)
 	{
@@ -501,7 +512,6 @@ void WebSocket::OnWrite(beast::error_code ec,
 		return;
 	}
 
-	_writeQueue.pop_front();
 	if (_closePending)
 	{
 		_writeQueue.clear();

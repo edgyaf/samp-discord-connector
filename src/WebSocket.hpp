@@ -110,6 +110,7 @@ private: // variables
 	using WebSocketStream_t = beast::websocket::stream<SslStream_t>;
 	std::unique_ptr<WebSocketStream_t> _websocket;
 	std::deque<std::string> _writeQueue;
+	bool _writeInProgress = false;
 	bool _closePending = false;
 	bool _closing = false;
 
