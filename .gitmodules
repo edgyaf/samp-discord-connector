@@ -3,7 +3,7 @@
 	url = https://github.com/maddinat0r/samp-plugin-sdk.git
 [submodule "libs/cmake"]
 	path = libs/cmake
-	url = https://github.com/Zeex/cmake-modules.git
+	url = https://github.com/AmyrAhmady/samp-cmake-modules.git
 [submodule "libs/date"]
 	path = libs/date
 	url = https://github.com/HowardHinnant/date.git
@@ -12,7 +12,7 @@
 	url = https://github.com/fmtlib/fmt.git
 [submodule "libs/log-core"]
 	path = libs/log-core
-	url = https://github.com/Alasnkz/samp-log-core.git
+	url = https://github.com/edgyaf/samp-log-core.git
 [submodule "libs/cmake-conan"]
 	path = libs/cmake-conan
 	url = https://github.com/conan-io/cmake-conan
