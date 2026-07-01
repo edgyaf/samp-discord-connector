@@ -125,11 +125,11 @@ if(MSVC AND NOT MSVC_VERSION VERSION_LESS 1940)
 endif()
 
 add_subdirectory(libs/log-core)
+add_subdirectory(libs/omp-sdk)
 
 if(DEFINED DCC_MSVC_VERSION)
 	set(MSVC_VERSION ${DCC_MSVC_VERSION})
 	unset(DCC_MSVC_VERSION)
 endif()
 
-add_subdirectory(libs/omp-sdk)
 add_subdirectory(src)

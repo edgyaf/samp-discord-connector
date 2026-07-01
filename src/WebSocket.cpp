@@ -507,7 +507,12 @@ void WebSocket::OnWrite(beast::error_code ec,
 
 		_writeQueue.clear();
 		if (_closePending)
-			StartClose();
+		{
+			asio::post(_ioContext, [this]()
+			{
+				StartClose();
+			});
+		}
 		// we don't handle reconnects here, as the read handler already does this
 		return;
 	}
@@ -515,10 +520,20 @@ void WebSocket::OnWrite(beast::error_code ec,
 	if (_closePending)
 	{
 		_writeQueue.clear();
-		StartClose();
+		asio::post(_ioContext, [this]()
+		{
+			StartClose();
+		});
 	}
 	else if (!_writeQueue.empty())
-		StartWrite();
+	{
+		// Let Beast release its internal write mutex before starting the
+		// next composed write operation.
+		asio::post(_ioContext, [this]()
+		{
+			StartWrite();
+		});
+	}
 }
 
 void WebSocket::Identify()
