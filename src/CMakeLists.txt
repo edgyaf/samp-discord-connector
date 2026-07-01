@@ -160,10 +160,16 @@ if (MSVC)
 		/MP
 	)
 elseif(UNIX)
+	# The optimized 32-bit connector crashes during gateway startup while the
+	# same Release configuration is stable without compiler optimization.
+	# Keep dependencies in Release mode and retain lightweight crash symbols.
 	target_compile_options(discord-connector PRIVATE
 		-Wall
 		-Wextra
 		-pedantic
+		$<$<CONFIG:Release>:-O0>
+		$<$<CONFIG:Release>:-g1>
+		$<$<CONFIG:Release>:-fno-omit-frame-pointer>
 	)
 endif()
 
