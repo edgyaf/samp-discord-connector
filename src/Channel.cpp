@@ -436,6 +436,7 @@ ChannelId_t ChannelManager::AddChannel(json const &data, GuildId_t guild_id/* = 
 			"can't create channel: duplicate key '{}'", id);
 		return INVALID_CHANNEL_ID;
 	}
+	m_ChannelHistory.emplace(id, sfid);
 
 	Logger::Get()->Log(samplog_LogLevel::INFO, "successfully added channel with id '{}'", id);
 	return id;
@@ -463,13 +464,13 @@ ChannelId_t ChannelManager::AddDMChannel(json const& data)
 			"can't create DM channel: channel handle space exhausted");
 		return INVALID_CHANNEL_ID;
 	}
-
 	if (!m_Channels.emplace(id, Channel_t(new Channel(id, sfid, Channel::Type::DM))).second)
 	{
 		Logger::Get()->Log(samplog_LogLevel::ERROR,
 			"can't create channel: duplicate key '{}'", id);
 		return INVALID_CHANNEL_ID;
 	}
+	m_ChannelHistory.emplace(id, sfid);
 
 	Logger::Get()->Log(samplog_LogLevel::INFO, "successfully added channel with id '{}'", id);
 	return id;
@@ -508,6 +509,9 @@ void ChannelManager::DeleteChannel(json const &data)
 		if (guild)
 			guild->RemoveChannel(channel_id);
 
+		Logger::Get()->Log(samplog_LogLevel::INFO,
+			"removing channel handle '{}' for Discord channel '{}' after CHANNEL_DELETE",
+			channel_id, sfid);
 		m_Channels.erase(channel_id);
 	});
 
@@ -519,6 +523,15 @@ Channel_t const &ChannelManager::FindChannel(ChannelId_t id)
 	auto it = m_Channels.find(id);
 	if (it == m_Channels.end())
 		return invalid_channel;
+	return it->second;
+}
+
+Snowflake_t const &ChannelManager::FindHistoricalChannelId(ChannelId_t id)
+{
+	static Snowflake_t invalid_id;
+	auto it = m_ChannelHistory.find(id);
+	if (it == m_ChannelHistory.end())
+		return invalid_id;
 	return it->second;
 }
 

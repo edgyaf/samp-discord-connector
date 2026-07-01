@@ -116,6 +116,7 @@ private:
 	std::atomic<unsigned int> m_Initialized{ 0 };
 
 	std::map<ChannelId_t, Channel_t> m_Channels; //PAWN channel-id to actual channel map
+	std::map<ChannelId_t, Snowflake_t> m_ChannelHistory;
 	std::atomic<ChannelId_t> m_NextChannelId{ 1 };
 	ChannelId_t m_CreatedChannelId = INVALID_CHANNEL_ID;
 
@@ -136,6 +137,7 @@ public:
 	void DeleteChannel(json const &data);
 
 	Channel_t const &FindChannel(ChannelId_t id);
+	Snowflake_t const &FindHistoricalChannelId(ChannelId_t id);
 	Channel_t const &FindChannelByName(std::string const &name);
 	Channel_t const &FindChannelById(Snowflake_t const &sfid);
 };

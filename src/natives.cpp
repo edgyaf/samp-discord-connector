@@ -70,7 +70,14 @@ AMX_DECLARE_NATIVE(Native::DCC_GetChannelId)
 	Channel_t const &channel = ChannelManager::Get()->FindChannel(channelid);
 	if (!channel)
 	{
-		Logger::Get()->LogNative(samplog_LogLevel::ERROR, "invalid channel id '{}'", channelid);
+		auto const &snowflake = ChannelManager::Get()->FindHistoricalChannelId(channelid);
+		if (snowflake.empty())
+			Logger::Get()->LogNative(samplog_LogLevel::ERROR,
+				"invalid channel id '{}' (not allocated in this plugin runtime)", channelid);
+		else
+			Logger::Get()->LogNative(samplog_LogLevel::ERROR,
+				"invalid channel id '{}' (previously represented Discord channel '{}')",
+				channelid, snowflake);
 		return 0;
 	}
 
@@ -265,7 +272,14 @@ AMX_DECLARE_NATIVE(Native::DCC_SendChannelMessage)
 	Channel_t const &channel = ChannelManager::Get()->FindChannel(channelid);
 	if (!channel)
 	{
-		Logger::Get()->LogNative(samplog_LogLevel::ERROR, "invalid channel id '{}'", channelid);
+		auto const &snowflake = ChannelManager::Get()->FindHistoricalChannelId(channelid);
+		if (snowflake.empty())
+			Logger::Get()->LogNative(samplog_LogLevel::ERROR,
+				"invalid channel id '{}' (not allocated in this plugin runtime)", channelid);
+		else
+			Logger::Get()->LogNative(samplog_LogLevel::ERROR,
+				"invalid channel id '{}' (previously represented Discord channel '{}')",
+				channelid, snowflake);
 		return 0;
 	}
 
@@ -2430,7 +2444,14 @@ AMX_DECLARE_NATIVE(Native::DCC_SendChannelEmbedMessage)
 	Channel_t const& channel = ChannelManager::Get()->FindChannel(channelid);
 	if (!channel)
 	{
-		Logger::Get()->LogNative(samplog_LogLevel::ERROR, "invalid channel id '{}'", channelid);
+		auto const &snowflake = ChannelManager::Get()->FindHistoricalChannelId(channelid);
+		if (snowflake.empty())
+			Logger::Get()->LogNative(samplog_LogLevel::ERROR,
+				"invalid channel id '{}' (not allocated in this plugin runtime)", channelid);
+		else
+			Logger::Get()->LogNative(samplog_LogLevel::ERROR,
+				"invalid channel id '{}' (previously represented Discord channel '{}')",
+				channelid, snowflake);
 		return 0;
 	}
 
