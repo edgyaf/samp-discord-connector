@@ -385,19 +385,20 @@ bool ChannelManager::CreateGuildChannel(Guild_t const &guild,
 			r.status, r.body, r.additional_data);
 		if (r.status / 100 == 2) // success
 		{
-			auto const channel_id = ChannelManager::Get()->AddChannel(json::parse(r.body));
-			if (channel_id == INVALID_CHANNEL_ID)
-				return;
-
-			if (cb)
+			auto channel_data = json::parse(r.body);
+			PawnDispatcher::Get()->Dispatch([this, cb, channel_data = std::move(channel_data)]() mutable
 			{
-				PawnDispatcher::Get()->Dispatch([=]()
+				auto const channel_id = AddChannel(channel_data);
+				if (channel_id == INVALID_CHANNEL_ID)
+					return;
+
+				if (cb)
 				{
 					m_CreatedChannelId = channel_id;
 					cb->Execute();
 					m_CreatedChannelId = INVALID_CHANNEL_ID;
-				});
-			}
+				}
+			});
 		}
 	});
 
@@ -494,15 +495,20 @@ void ChannelManager::DeleteChannel(json const &data)
 			return;
 		}
 
+		// Do not retain a reference to a map element while executing Pawn code.
+		// A callback may re-enter the channel manager and invalidate it.
+		const ChannelId_t channel_id = channel->GetPawnId();
+		const GuildId_t guild_id = channel->GetGuildId();
+
 		// forward DCC_OnChannelDelete(DCC_Channel:channel);
 		pawn_cb::Error error;
-		pawn_cb::Callback::CallFirst(error, "DCC_OnChannelDelete", channel->GetPawnId());
+		pawn_cb::Callback::CallFirst(error, "DCC_OnChannelDelete", channel_id);
 
-		Guild_t const &guild = GuildManager::Get()->FindGuild(channel->GetGuildId());
+		Guild_t const &guild = GuildManager::Get()->FindGuild(guild_id);
 		if (guild)
-			guild->RemoveChannel(channel->GetPawnId());
+			guild->RemoveChannel(channel_id);
 
-		m_Channels.erase(channel->GetPawnId());
+		m_Channels.erase(channel_id);
 	});
 
 }

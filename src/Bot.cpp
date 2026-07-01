@@ -59,19 +59,20 @@ bool ThisBot::CreatePrivateChannel(User_t const &user, pawn_cb::Callback_t &&cal
 			r.status, r.body, r.additional_data);
 		if (r.status / 100 == 2) // success
 		{
-			auto const channel_id = ChannelManager::Get()->AddChannel(json::parse(r.body));
-			if (channel_id == INVALID_CHANNEL_ID)
-				return;
-
-			if (callback)
+			auto channel_data = json::parse(r.body);
+			PawnDispatcher::Get()->Dispatch([this, callback, channel_data = std::move(channel_data)]() mutable
 			{
-				PawnDispatcher::Get()->Dispatch([=]()
+				auto const channel_id = ChannelManager::Get()->AddChannel(channel_data);
+				if (channel_id == INVALID_CHANNEL_ID)
+					return;
+
+				if (callback)
 				{
 					m_CreatedChannelId = channel_id;
 					callback->Execute();
 					m_CreatedChannelId = INVALID_CHANNEL_ID;
-				});
-			}
+				}
+			});
 		}
 	});
 
