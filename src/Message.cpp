@@ -408,22 +408,28 @@ void MessageManager::CreateFromSnowflake(Snowflake_t channel, Snowflake_t messag
 				r.status, r.body, r.additional_data);
 			if (r.status / 100 == 2) // success
 			{
-				const auto & message_id = Create(json::parse(r.body));
+				const auto message_id = Create(json::parse(r.body));
 				if (callback)
 				{
 					PawnDispatcher::Get()->Dispatch([this, message_id, callback]() mutable
 					{
-						if (message_id)
-						{
-							SetCreatedMessageId(message_id);
-							callback->Execute();
-							SetCreatedMessageId(INVALID_MESSAGE_ID);
-						}
+						if (message_id == INVALID_MESSAGE_ID)
+							return;
+
+						SetCreatedMessageId(message_id);
+						callback->Execute();
+						SetCreatedMessageId(INVALID_MESSAGE_ID);
+
+						auto const& message = Find(message_id);
+						if (message && !message->Persistent())
+							Delete(message_id);
 					});
 				}
-				if (!Find(message_id)->Persistent())
+				else
 				{
-					Delete(message_id);
+					auto const& message = Find(message_id);
+					if (message && !message->Persistent())
+						Delete(message_id);
 				}
 			}
 		}

@@ -39,7 +39,7 @@ private:
 
 	bool _valid;
 
-	bool m_Persistent;
+	bool m_Persistent = false;
 
 	enum class ReactionType : int
 	{
