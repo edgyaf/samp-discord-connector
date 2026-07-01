@@ -420,12 +420,26 @@ void WebSocket::OnRead(beast::error_code ec,
 	Read();
 }
 
-void WebSocket::Write(std::string const &data)
+void WebSocket::Write(std::string data)
 {
 	Logger::Get()->Log(samplog_LogLevel::DEBUG, "WebSocket::Write");
 
+	asio::post(_ioContext, [this, data = std::move(data)]() mutable
+	{
+		if (!_websocket)
+			return;
+
+		bool const writeInProgress = !_writeQueue.empty();
+		_writeQueue.emplace_back(std::move(data));
+		if (!writeInProgress)
+			StartWrite();
+	});
+}
+
+void WebSocket::StartWrite()
+{
 	_websocket->async_write(
-		asio::buffer(data),
+		asio::buffer(_writeQueue.front()),
 		beast::bind_front_handler(
 			&WebSocket::OnWrite,
 			this));
@@ -444,8 +458,14 @@ void WebSocket::OnWrite(beast::error_code ec,
 			"Can't write to Discord websocket gateway: {} ({})",
 			ec.message(), ec.value());
 
+		_writeQueue.clear();
 		// we don't handle reconnects here, as the read handler already does this
+		return;
 	}
+
+	_writeQueue.pop_front();
+	if (!_writeQueue.empty())
+		StartWrite();
 }
 
 void WebSocket::Identify()

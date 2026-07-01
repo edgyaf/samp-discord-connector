@@ -3,12 +3,14 @@
 #include <string>
 #include <functional>
 #include <chrono>
+#include <deque>
 #include <map>
 #include <thread>
 #include <memory>
 
 #include <json.hpp>
 #include <boost/asio/strand.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/ssl.hpp>
@@ -107,6 +109,7 @@ private: // variables
 	using SslStream_t = beast::ssl_stream<beast::tcp_stream>;
 	using WebSocketStream_t = beast::websocket::stream<SslStream_t>;
 	std::unique_ptr<WebSocketStream_t> _websocket;
+	std::deque<std::string> _writeQueue;
 
 	bool _reconnect = false;
 	asio::steady_timer _reconnectTimer;
@@ -142,7 +145,8 @@ private: // functions
 	void OnRead(beast::error_code ec,
 		std::size_t bytes_transferred);
 
-	void Write(std::string const &data);
+	void Write(std::string data);
+	void StartWrite();
 	void OnWrite(beast::error_code ec,
 		size_t bytes_transferred);
 

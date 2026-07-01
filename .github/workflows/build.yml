@@ -66,11 +66,9 @@ jobs:
 
     - if: runner.os == 'Windows'
       name: Install openssl
-      run: choco install openssl --forcex86 | out-null
-      
-    - if: runner.os == 'Windows'
-      name: Setup openssl envvar
-      run: echo "OPENSSL_ROOT=C:\\Program Files (x86)\\OpenSSL-Win32" >> $GITHUB_ENV
+      run: |
+        vcpkg install openssl:x86-windows-static-md
+        "OPENSSL_ROOT=$env:VCPKG_INSTALLATION_ROOT\installed\x86-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       
     - if: runner.os == 'Linux'
       name: Install gcc/g++-multilib
