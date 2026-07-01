@@ -418,9 +418,16 @@ ChannelId_t ChannelManager::AddChannel(json const &data, GuildId_t guild_id/* = 
 	if (channel)
 		return channel->GetPawnId(); // channel already exists
 
-	ChannelId_t id = 1;
-	while (m_Channels.find(id) != m_Channels.end())
-		++id;
+	// Pawn scripts can retain channel handles indefinitely. Never recycle a
+	// deleted channel's handle, otherwise an old handle can silently start
+	// referring to a different Discord channel.
+	const ChannelId_t id = m_NextChannelId.fetch_add(1);
+	if (id <= INVALID_CHANNEL_ID)
+	{
+		Logger::Get()->Log(samplog_LogLevel::ERROR,
+			"can't create channel: channel handle space exhausted");
+		return INVALID_CHANNEL_ID;
+	}
 
 	if (!m_Channels.emplace(id, Channel_t(new Channel(id, data, guild_id))).second)
 	{
@@ -447,9 +454,14 @@ ChannelId_t ChannelManager::AddDMChannel(json const& data)
 	if (channel)
 		return channel->GetPawnId(); // channel already exists
 
-	ChannelId_t id = 1;
-	while (m_Channels.find(id) != m_Channels.end())
-		++id;
+	// Channel handles are process-lifetime identities and must not be reused.
+	const ChannelId_t id = m_NextChannelId.fetch_add(1);
+	if (id <= INVALID_CHANNEL_ID)
+	{
+		Logger::Get()->Log(samplog_LogLevel::ERROR,
+			"can't create DM channel: channel handle space exhausted");
+		return INVALID_CHANNEL_ID;
+	}
 
 	if (!m_Channels.emplace(id, Channel_t(new Channel(id, sfid, Channel::Type::DM))).second)
 	{

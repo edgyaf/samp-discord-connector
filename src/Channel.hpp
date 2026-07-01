@@ -116,6 +116,7 @@ private:
 	std::atomic<unsigned int> m_Initialized{ 0 };
 
 	std::map<ChannelId_t, Channel_t> m_Channels; //PAWN channel-id to actual channel map
+	std::atomic<ChannelId_t> m_NextChannelId{ 1 };
 	ChannelId_t m_CreatedChannelId = INVALID_CHANNEL_ID;
 
 public:
