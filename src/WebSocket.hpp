@@ -113,6 +113,8 @@ private: // variables
 	bool _writeInProgress = false;
 	bool _closePending = false;
 	bool _closing = false;
+	bool _authenticated = false;
+	std::deque<std::string> _pendingAuthenticatedWrites;
 
 	bool _reconnect = false;
 	asio::steady_timer _reconnectTimer;
@@ -150,6 +152,7 @@ private: // functions
 		std::size_t bytes_transferred);
 
 	void Write(std::string data);
+	void WriteAuthenticated(std::string data);
 	void StartWrite();
 	void OnWrite(beast::error_code ec,
 		size_t bytes_transferred);

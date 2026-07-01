@@ -946,25 +946,28 @@ bool GuildManager::CreateGuildRole(Guild_t const &guild,
 			r.status, r.body, r.additional_data);
 		if (r.status / 100 == 2) // success
 		{
-			auto const &guild = GuildManager::Get()->FindGuild(guild_id);
-			if (!guild)
+			auto role_data = json::parse(r.body);
+			PawnDispatcher::Get()->Dispatch(
+				[this, cb, guild_id, role_data = std::move(role_data)]() mutable
 			{
-				Logger::Get()->Log(samplog_LogLevel::ERROR, "lost cached guild between network calls");
-				return;
-			}
+				auto const &guild = GuildManager::Get()->FindGuild(guild_id);
+				if (!guild)
+				{
+					Logger::Get()->Log(samplog_LogLevel::ERROR,
+						"lost cached guild between network calls");
+					return;
+				}
 
-			auto const role = RoleManager::Get()->AddRole(json::parse(r.body));
-			guild->AddRole(role);
+				auto const role = RoleManager::Get()->AddRole(role_data);
+				guild->AddRole(role);
 
-			if (cb)
-			{
-				PawnDispatcher::Get()->Dispatch([=]()
+				if (cb)
 				{
 					m_CreatedRoleId = role;
 					cb->Execute();
 					m_CreatedRoleId = INVALID_ROLE_ID;
-				});
-			}
+				}
+			});
 		}
 	});
 

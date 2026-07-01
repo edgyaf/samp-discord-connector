@@ -156,12 +156,8 @@ void WebSocket::OnHandshake(beast::error_code ec)
 
 	_reconnectCount = 0;
 
-	// read before identifying/resuming to make sure we catch the result
+	// Discord sends HELLO before the client may identify or resume.
 	Read();
-	if (_reconnect)
-		SendResumePayload();
-	else
-		Identify();
 }
 
 void WebSocket::Disconnect(bool reconnect /*= false*/)
@@ -222,7 +218,9 @@ void WebSocket::OnClose(beast::error_code ec)
 	_closing = false;
 	_closePending = false;
 	_writeInProgress = false;
+	_authenticated = false;
 	_writeQueue.clear();
+	_buffer.clear();
 	m_HeartbeatTimer.cancel();
 
 	if (_reconnect)
@@ -298,7 +296,15 @@ void WebSocket::OnRead(beast::error_code ec,
 				_websocket->reason().reason.c_str(),
 				_websocket->reason().code);
 
-			if (_websocket->reason().code == 4014)
+			if (_websocket->reason().code == 4003
+				|| _websocket->reason().code == 4007
+				|| _websocket->reason().code == 4009)
+			{
+				// The old session cannot safely be resumed.
+				m_SessionId.clear();
+				reconnect = true;
+			}
+			else if (_websocket->reason().code == 4014)
 			{
 				logprintf(" >> discord-connector: bot could not connect due to intent permissions. Modify your discord bot settings and enable every intent.");
 				reconnect = false;
@@ -422,6 +428,16 @@ void WebSocket::OnRead(beast::error_code ec,
 			if (event == Event::READY)
 				m_SessionId = data["session_id"].get<std::string>();
 
+			if (event == Event::READY || event == Event::RESUMED)
+			{
+				_authenticated = true;
+				while (!_pendingAuthenticatedWrites.empty())
+				{
+					Write(std::move(_pendingAuthenticatedWrites.front()));
+					_pendingAuthenticatedWrites.pop_front();
+				}
+			}
+
 			auto event_range = m_EventMap.equal_range(event);
 			for (auto ev_it = event_range.first; ev_it != event_range.second; ++ev_it)
 				ev_it->second(data);
@@ -438,12 +454,22 @@ void WebSocket::OnRead(beast::error_code ec,
 		Disconnect(true);
 		return;
 	case 9: // invalid session
-		Identify();
+		if (result["d"].is_boolean() && result["d"].get<bool>() && !m_SessionId.empty())
+			SendResumePayload();
+		else
+		{
+			_reconnect = false;
+			m_SessionId.clear();
+			Identify();
+		}
 		break;
 	case 10: // hello
-		// at this point we're connected to the gateway, but not authenticated
-		// start heartbeat
+		// Authenticate before allowing presence or other application payloads.
 		m_HeartbeatInterval = std::chrono::milliseconds(result["d"]["heartbeat_interval"]);
+		if (_reconnect && !m_SessionId.empty())
+			SendResumePayload();
+		else
+			Identify();
 		DoHeartbeat({});
 		break;
 	case 11: // heartbeat ACK
@@ -463,6 +489,27 @@ void WebSocket::Write(std::string data)
 
 	asio::post(_ioContext, [this, data = std::move(data)]() mutable
 	{
+		if (!_websocket || _closing || _closePending)
+			return;
+
+		_writeQueue.emplace_back(std::move(data));
+		if (!_writeInProgress)
+			StartWrite();
+	});
+}
+
+void WebSocket::WriteAuthenticated(std::string data)
+{
+	Logger::Get()->Log(samplog_LogLevel::DEBUG, "WebSocket::WriteAuthenticated");
+
+	asio::post(_ioContext, [this, data = std::move(data)]() mutable
+	{
+		if (!_authenticated)
+		{
+			_pendingAuthenticatedWrites.emplace_back(std::move(data));
+			return;
+		}
+
 		if (!_websocket || _closing || _closePending)
 			return;
 
@@ -596,7 +643,7 @@ void WebSocket::RequestGuildMembers(std::string guild_id)
 		} }
 	};
 
-	Write(payload.dump());
+	WriteAuthenticated(payload.dump());
 }
 
 void WebSocket::UpdateStatus(std::string const &status, std::string const &activity_name)
@@ -621,7 +668,7 @@ void WebSocket::UpdateStatus(std::string const &status, std::string const &activ
 		};
 	}
 
-	Write(payload.dump());
+	WriteAuthenticated(payload.dump());
 }
 
 void WebSocket::DoHeartbeat(beast::error_code ec)
