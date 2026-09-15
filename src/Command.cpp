@@ -198,14 +198,6 @@ void CommandManager::Initialize()
 									m_Initialized++;
 								}
 							});
-							if (!m_InitGuilds) {
-								json commands = json::parse(commandr.body);
-								for (auto& command : commands.items())
-								{
-									ParseCommandCreationData(command.value());
-								}
-								m_Initialized++;
-							}
 						}
 					}
 				});
