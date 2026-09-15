@@ -153,49 +153,55 @@ void CommandManager::Initialize()
 		{
 			json response = json::parse(r.body);
 			ThisBot::Get()->SetApplicationID(response.at("id"));
-
-			Network::Get()->Http().Get(fmt::format("/applications/{:s}/commands", ThisBot::Get()->GetApplicationID()), [this](Http::Response commandr)
-			{
+			// Starting a thread to wait for GuildManager to finish loading servers
+			std::thread([this]() {
+				// Waiting for GuildManager to populate all its guilds from GUILD_CREATE packets
+				while (!GuildManager::Get()->IsInitialized()) {
+					std::this_thread::sleep_for(std::chrono::milliseconds(50));
+				}
+				// Its safe to call GetGuilds().size() now, because GuildManager is fully initialized
+				Network::Get()->Http().Get(fmt::format("/applications/{:s}/commands", ThisBot::Get()->GetApplicationID()), [this](Http::Response commandr)
+				{
 					if (commandr.status == 200)
 					{
 						m_InitGuilds = GuildManager::Get()->GetGuilds().size();
+						// If there are no guilds (even after GuildManager has finished)
+						if (m_InitGuilds == 0)
+						{
+							json commands = json::parse(commandr.body);
+							for (auto& command : commands.items()) {
+								ParseCommandCreationData(command.value());
+							}
+							m_Initialized++;
+							return;
+						}
 						for (auto & guild : GuildManager::Get()->GetGuilds())
 						{
 							Network::Get()->Http().Get(fmt::format("/applications/{:s}/guilds/{:s}/commands", ThisBot::Get()->GetApplicationID(), GuildManager::Get()->FindGuild(guild)->GetId()),
 								[this, guild, commandr](Http::Response guild_command)
 							{
-									if (guild_command.status == 200)
-									{
-										json commands = json::parse(guild_command.body);
-										for (auto & command : commands.items())
-										{
-											ParseCommandCreationData(command.value(), guild);
-										}
-									}
-									m_InitGuilds--;
-
-									if (!m_InitGuilds) {
-										json commands = json::parse(commandr.body);
-										for (auto& command : commands.items())
-										{
-											ParseCommandCreationData(command.value());
-										}
-										m_Initialized++;
-									}
-							});
-							if (!m_InitGuilds) {
-								json commands = json::parse(commandr.body);
-								for (auto& command : commands.items())
+								if (guild_command.status == 200)
 								{
-									ParseCommandCreationData(command.value());
+									json commands = json::parse(guild_command.body);
+									for (auto & command : commands.items())
+									{
+										ParseCommandCreationData(command.value(), guild);
+									}
 								}
-								m_Initialized++;
-							}
+								m_InitGuilds--;
+								if (!m_InitGuilds) {
+									json commands = json::parse(commandr.body);
+									for (auto& command : commands.items())
+									{
+										ParseCommandCreationData(command.value());
+									}
+									m_Initialized++;
+								}
+							});
 						}
-
-						
 					}
-			});
+				});
+			}).detach();
 		}, false);
 	});
 
